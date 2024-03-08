@@ -71,12 +71,17 @@ class PrecedenceEvaluator:
 
     def next_subexpression(self, expression_str):
         if '(' in expression_str or ')' in expression_str:
-            return self.__extract_parenth_expr(expression_str)
-        elif '^' in expression_str:
+            # Get the highest precedence parenthesis-enclosed subexpression
+            # This subexpression may contain more than one operations;
+            # determine its highest precedence operations within it
+            # using EMDAS rules 
+            sub_expression = self.__extract_parenth_expr(expression_str)
+            expression_str = sub_expression
+        if '^' in expression_str:
             return self.__extract_exponentiation(expression_str)
-        elif '*' in expression_str or '/' in expression_str:
+        if '*' in expression_str or '/' in expression_str:
             return self.__extract_mult_divis(expression_str)
-        elif '+' in expression_str or '-' in expression_str:
+        if '+' in expression_str or '-' in expression_str:
             return self.__extract_add_sub(expression_str)
         else:
             print("Something has gone wrong!")
