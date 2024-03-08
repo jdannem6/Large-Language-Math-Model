@@ -17,7 +17,31 @@ class PrecedenceEvaluator:
             end += 1
         return expression_str[start:end+1]
     
-
+    def __determine_nested_levels(self, expression_str):
+        nested_levels_list = []
+        nested_level = 0
+        i = 0
+        while i < len(expression_str):
+            if expression_str[i] == '(':
+                nested_levels_list.append(("", nested_level, i))
+                nested_level += 1
+            elif expression_str[i] == ')':
+                nested_level -= 1
+                start_index = None
+                for j in range(len(nested_levels_list) - 1, -1, -1):
+                    if nested_levels_list[j][1] == nested_level:
+                        start_index = nested_levels_list[j][2]
+                        nested_levels_list[j] = (expression_str[start_index + 1:i], nested_level, start_index)
+                        break
+            i += 1
+        return nested_levels_list
+    
+    def __extract_parenth_expr(self, expression_str):
+        nested_levels_list = self.__determine_nested_levels(expression_str)
+        if not nested_levels_list:
+            return ""
+        highest_nested = max(nested_levels_list, key=lambda x: x[1])
+        return highest_nested[0]
     
     def __extract_exponentiation(self, expression_str):
         idx = expression_str.find('^')
