@@ -69,3 +69,25 @@ class PrecedenceEvaluator:
         if sub_idx != -1:
             return self.__extract_operation(expression_str, sub_idx)
 
+    def next_subexpression(self, expression_str):
+        if '(' in expression_str or ')' in expression_str:
+            return self.__extract_parenth_expr(expression_str)
+        elif '^' in expression_str:
+            return self.__extract_exponentiation(expression_str)
+        elif '*' in expression_str or '/' in expression_str:
+            return self.__extract_mult_divis(expression_str)
+        elif '+' in expression_str or '-' in expression_str:
+            return self.__extract_add_sub(expression_str)
+        else:
+            print("Something has gone wrong!")
+            return ""
+        
+def main():
+    expression = "(3+(2+3-3^4))*(3+2)"
+    print("original expression:", expression)
+    my_pe = PrecedenceEvaluator()
+    result_str = my_pe.next_subexpression(expression)
+    print(result_str)
+
+if __name__ == "__main__":
+    main()
