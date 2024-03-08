@@ -12,65 +12,98 @@
 ##                   of occurences of each operator                          ##
 ##                c) "operand counts": a string detailing the total number   ##
 ##                    of occurences of each operand                          ##
-## Last Modified: 16 Feb 2024                                                ##
+## Last Modified: 8 March 2024                                               ##
 ###############################################################################
 
+from sympy import sympify, symbols
 import numpy as np
 from DatasetGenerator import ArithDatasetGen
-
+import re # Needed for extracting operands and operators from regular 
+          # expressions
 
 class ExpressionEvaluator():
     def __init__(self, raw_dataset):
         self.__raw_dataset = raw_dataset
         self.__processed_dataset = {}
-    """ Gets two operands from a string containing an atomic expression and 
-        and returns them as an ordered pair"""
-    def __get_operands(self, sub_expression):
-        sub_expression = sub_expression.replace('(', "").replace(')', "")
-        print(sub_expression)
-        operand1 = int(sub_expression.split('*')[0])
-        operand2 = int(sub_expression.split('*')[-1])
-        return (operand1, operand2)
-    
-    """ Given an arithmetic expression, creates a ditionary mapping operator 
-        and parentheses to the order in which they occur
-        param[in] tokens: A list of tokens to count within the string. E.g.,
-                          the operators or the operands to search for.
-    """
-    def __get_counts(self, tokens, raw_sample_str, count_operands=False):
-        counts = {}
-        for char in raw_sample_str:
-            # Count the operators and parentheses
-            if not count_operands:
-                if char in tokens:
-                    if char not in counts:
-                        counts[char] = 1
-                    else:
-                        counts[char] = counts[char] + 1
-            # Otherwise, count the operands
+
+    """ Converts a list of symbol occurrences to a dictionary giving
+        the total number of occurences for each symbol. Used for 
+        determing operator and operand counts """
+    def __convert_to_count_dict(self, list_of_occurrences):
+        counts_dict = {}
+        for symbol in list_of_occurrences:
+            # Set count to 1 for any symbol the first time its occurred
+            if symbol not in counts_dict:
+                counts_dict[symbol] = 1
+            # Increment count for subsequent encounters of symbol
             else:
-                if char not in tokens:
-                    if char not in counts:
-                        counts[char] = 1
-                    else:
-                        counts[char] = counts[char] + 1
-        return counts
+                counts_dict[symbol] += 1
+        return counts_dict
+    
+    """ Creates a dictionary mapping each operand to the number of times it 
+        occurs within the expression """
+    def __get_operand_counts(self, expression_str):
+        # Create a pattern to define the format of the operands in the 
+        # arithmetic string
+        operand_pattern = r'\b\d+\b' #\b - word break, \d a digit
+        operands_in_expression = re.findall(operand_pattern, expression_str)
+
+        ## Get the total numer of counts for all the operators in the 
+        ## expression
+        operand_counts = self.__convert_to_count_dict(operands_in_expression)
+        return operand_counts
+    
+    """ Creates a dictionary mapping each operator (including parenthesis) 
+        to the number of times it  occurs within the expression """
+    def __get_operator_counts(self, expression_str):
+        # Create a pattern to define the format of operators to serach
+        # for in the string
+        operator_pattern = r'[\^\*/\+\-\(\)]'
+        operators_in_expression = re.findall(operator_pattern, expression_str)
+        ## Get the total numer of counts for all the operators in the 
+        ## expression
+        operator_counts = self.__convert_to_count_dict(operators_in_expression)
+        return operator_counts       
+
+    """ Replaces constants with vars"""
+    def __replace_constants_with_vars(self, expression):
+        # Parse the expression into a sympy expression
+        sympy_expr = sympify(expression)
+
+        # Get all the constants in the expression
+        constants = list()
+        print(sympy_expr.atoms())
+        operands = self.__get_operands(expression)
+
+        for operand in operands:
+            constants.append(operand)
+        print(constants)
+
+        # Replace each constant with a unique symbolic variable
+        symbol_dict = {symbols(f'x_{i}'): constant for i, constant in enumerate(constants)}
+        for key in symbol_dict.keys():
+            value = symbol_dict[key]
+            expression = expression.replace(str(value), str(key))
+            print(expression)
+
+        return expression, symbol_dict
+    
     """ Converts the string form describing the expression to a dictionary of 
         steps where each key is the step index and each value is the string
         describing the partially simplified expression for that step"""
     def __get_eval_steps(self, raw_sample_str):
         eval_steps = {}
-        sub_expressions = [sub_exp + ')' for sub_exp in raw_sample_str.split(')') if sub_exp]
-        sub_exp1 = sub_expressions[0] 
-        sub_exp2 = sub_expressions[1].split('+')[-1]
+        # sub_expressions = [sub_exp + ')' for sub_exp in raw_sample_str.split(')') if sub_exp]
+        # sub_exp1 = sub_expressions[0] 
+        # sub_exp2 = sub_expressions[1].split('+')[-1]
 
 
-        sub_exp1_operands = self.__get_operands(sub_exp1)
-        sub_exp2_operands = self.__get_operands(sub_exp2)
+        # sub_exp1_operands = self.__get_operands(sub_exp1)
+        # sub_exp2_operands = self.__get_operands(sub_exp2)
 
-        eval_steps[1] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]}+{sub_exp2}"
-        eval_steps[2] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]}+{sub_exp2_operands[0]*sub_exp2_operands[1]}"
-        eval_steps[3] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]+sub_exp2_operands[0]*sub_exp2_operands[1]}"
+        # eval_steps[1] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]}+{sub_exp2}"
+        # eval_steps[2] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]}+{sub_exp2_operands[0]*sub_exp2_operands[1]}"
+        # eval_steps[3] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]+sub_exp2_operands[0]*sub_exp2_operands[1]}"
         return eval_steps
     
     """ Generates the operator counts, operand counts, and the steps for a given 
@@ -80,11 +113,10 @@ class ExpressionEvaluator():
 
         eval_steps =  self.__get_eval_steps(raw_sample_str)
         operator_tokens = [')', '(', '[', ']', '*', '+']
-        operator_counts = self.__get_counts(operator_tokens, raw_sample_str, count_operands=False)
-        operand_counts = self.__get_counts(operator_tokens, raw_sample_str, count_operands=True)
+        operator_counts = self.__get_operator_counts(raw_sample_str)
+        operand_counts = self.__get_operand_counts(raw_sample_str)
 
         return (eval_steps, operator_counts, operand_counts)
-    
     """ Generates the dataset of arithmetic expressions with the steps to solve them """
     def process_dataset(self):
         for raw_sample in self.__raw_dataset:
@@ -96,12 +128,19 @@ class ExpressionEvaluator():
 
 
 
+
 def main():
     raw_datagen = ArithDatasetGen(num_samples=10 , lower_bound=0, upper_bound=5)
     raw_dataset = raw_datagen.generate_new_dataset()
     expression_evaluator = ExpressionEvaluator(raw_dataset)
+    test_expression  = "34*4 + 33*2"
+    print(f"original expression: {test_expression}")
     processed_dataset = expression_evaluator.process_dataset()
     print(processed_dataset)
+
+
+
+
 
 if __name__ == "__main__":
     main()
