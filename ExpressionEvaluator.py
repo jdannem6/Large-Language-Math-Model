@@ -65,28 +65,6 @@ class ExpressionEvaluator():
         operator_counts = self.__convert_to_count_dict(operators_in_expression)
         return operator_counts       
 
-    """ Replaces constants with vars"""
-    def __replace_constants_with_vars(self, expression):
-        # Parse the expression into a sympy expression
-        sympy_expr = sympify(expression)
-
-        # Get all the constants in the expression
-        constants = list()
-        print(sympy_expr.atoms())
-        operands = self.__get_operands(expression)
-
-        for operand in operands:
-            constants.append(operand)
-        print(constants)
-
-        # Replace each constant with a unique symbolic variable
-        symbol_dict = {symbols(f'x_{i}'): constant for i, constant in enumerate(constants)}
-        for key in symbol_dict.keys():
-            value = symbol_dict[key]
-            expression = expression.replace(str(value), str(key))
-            print(expression)
-
-        return expression, symbol_dict
     
     """ Converts the string form describing the expression to a dictionary of 
         steps where each key is the step index and each value is the string
