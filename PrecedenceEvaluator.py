@@ -7,6 +7,18 @@
 class PrecedenceEvaluator:
     def __init__(self):
         pass
+
+    def __extract_operation(self, expression_str, op_idx):
+        start = op_idx - 1
+        while start > 0 and expression_str[start].isdigit():
+            start -= 1
+        end = op_idx + 1
+        while end < len(expression_str) and expression_str[end].isdigit():
+            end += 1
+        return expression_str[start:end+1]
+    
+
+    
     def __extract_exponentiation(self, expression_str):
         idx = expression_str.find('^')
         if idx != -1:
