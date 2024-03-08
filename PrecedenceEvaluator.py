@@ -12,6 +12,11 @@ class PrecedenceEvaluator:
         start = op_idx - 1
         while start > 0 and expression_str[start].isdigit():
             start -= 1
+        ## Don't extract negative signs that precede the expression. These
+        ## are subtraction operations of the preceding expression, so they
+        ## should not be extracted
+        if expression_str[start] == "-":
+            start += 1
         end = op_idx + 1
         while end < len(expression_str) and expression_str[end].isdigit():
             end += 1
