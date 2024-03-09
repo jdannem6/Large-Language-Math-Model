@@ -15,16 +15,19 @@
 ## Last Modified: 8 March 2024                                               ##
 ###############################################################################
 
-from sympy import sympify, symbols
+import sympy as sp
 import numpy as np
 from DatasetGenerator import ArithDatasetGen
+from PrecedenceEvaluator import PrecedenceEvaluator
 import re # Needed for extracting operands and operators from regular 
           # expressions
+import math
 
 class ExpressionEvaluator():
     def __init__(self, raw_dataset):
         self.__raw_dataset = raw_dataset
         self.__processed_dataset = {}
+        self.precedence_eval = PrecedenceEvaluator()
 
     """ Converts a list of symbol occurrences to a dictionary giving
         the total number of occurences for each symbol. Used for 
@@ -64,24 +67,39 @@ class ExpressionEvaluator():
         ## expression
         operator_counts = self.__convert_to_count_dict(operators_in_expression)
         return operator_counts       
-
+    """ Simple helper function to determine if expression is fully simplified
+        based on whether operators still exist within it """
+    def __is_solved(self, expression_str):
+        # Create a pattern to define the format of operators to search
+        # for in the string
+        operator_pattern = r'[\^\*/\+\-\(\)]'
+        operators_in_expr = re.findall(operator_pattern, expression_str)
+        # Expression is solved if there are no operators left in string or for negative numbers
+        # if there is one operator (the negative sign)
+        print("expression string in is solved: ", expression_str)
+        expression_is_solved = len(operators_in_expr) == 0 or \
+                               "-" in expression_str  and len(operators_in_expr) == 1
+        return expression_is_solved
     
     """ Converts the string form describing the expression to a dictionary of 
         steps where each key is the step index and each value is the string
         describing the partially simplified expression for that step"""
-    def __get_eval_steps(self, raw_sample_str):
+    def __get_eval_steps(self, expression_str):
         eval_steps = {}
-        # sub_expressions = [sub_exp + ')' for sub_exp in raw_sample_str.split(')') if sub_exp]
-        # sub_exp1 = sub_expressions[0] 
-        # sub_exp2 = sub_expressions[1].split('+')[-1]
-
-
-        # sub_exp1_operands = self.__get_operands(sub_exp1)
-        # sub_exp2_operands = self.__get_operands(sub_exp2)
-
-        # eval_steps[1] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]}+{sub_exp2}"
-        # eval_steps[2] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]}+{sub_exp2_operands[0]*sub_exp2_operands[1]}"
-        # eval_steps[3] = f"{sub_exp1_operands[0]*sub_exp1_operands[1]+sub_exp2_operands[0]*sub_exp2_operands[1]}"
+        i = 0
+        while not self.__is_solved(expression_str):
+            # Determine the highest precedence subexpression within the
+            # expression string
+            next_subexpr, start_idx, end_idx = \
+                self.precedence_eval.next_subexpression(expression_str)
+            # Solve the atomic subexpression
+            subexp = sp.sympify(next_subexpr)
+            subexpr_result = str(float(subexp.evalf())) # float needed due to sympys unnecessary precision
+            # Substitute the result back into the original expression
+            expression_str = expression_str[:start_idx] + subexpr_result \
+                            + expression_str[end_idx+1:]
+            eval_steps[i] = expression_str
+            i +=1
         return eval_steps
     
     """ Generates the operator counts, operand counts, and the steps for a given 
@@ -90,7 +108,6 @@ class ExpressionEvaluator():
     def process_sample(self, raw_sample_str):
 
         eval_steps =  self.__get_eval_steps(raw_sample_str)
-        operator_tokens = [')', '(', '[', ']', '*', '+']
         operator_counts = self.__get_operator_counts(raw_sample_str)
         operand_counts = self.__get_operand_counts(raw_sample_str)
 
@@ -98,23 +115,28 @@ class ExpressionEvaluator():
     """ Generates the dataset of arithmetic expressions with the steps to solve them """
     def process_dataset(self):
         for raw_sample in self.__raw_dataset:
+            # raw_sample = raw_sample.replace(" ", "")
+            print(raw_sample)
             eval_steps, operator_counts, operand_counts = self.process_sample(raw_sample)
             self.__processed_dataset[raw_sample] = {"eval_steps": eval_steps,
                                                     "operator_counts": operator_counts,
                                                     "operand_counts": operand_counts}
         return self.__processed_dataset
 
-
+from sympy import pprint
 
 
 def main():
-    raw_datagen = ArithDatasetGen(num_samples=10 , lower_bound=0, upper_bound=5)
+    raw_datagen = ArithDatasetGen(num_samples=10, lower_bound=1, upper_bound=10)
     raw_dataset = raw_datagen.generate_new_dataset()
+    # pprint(raw_dataset)
+    # raw_dataset = ["(3-(2-3-3-4))-(3-2)"]
+    raw_dataset = ["(3+(2+3-3^4))*(3+2)"]
+    
     expression_evaluator = ExpressionEvaluator(raw_dataset)
-    test_expression  = "34*4 + 33*2"
-    print(f"original expression: {test_expression}")
+
     processed_dataset = expression_evaluator.process_dataset()
-    print(processed_dataset)
+    pprint(processed_dataset)
 
 
 
