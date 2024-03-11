@@ -2,7 +2,7 @@
 ## Decription: Defines a class to take an arithmetic expression string and   ##
 ##             determine and return the atomic subexpression within it       ##
 ##             having highest precedence                                     ## 
-## Last Modified: 9 March 2024                                               ##
+## Last Modified: 11 March 2024                                              ##
 ###############################################################################
 import re
 class PrecedenceEvaluator:

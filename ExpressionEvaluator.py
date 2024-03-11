@@ -12,17 +12,16 @@
 ##                   of occurences of each operator                          ##
 ##                c) "operand counts": a string detailing the total number   ##
 ##                    of occurences of each operand                          ##
-## Last Modified: 8 March 2024                                               ##
+## Last Modified: 11 March 2024                                               ##
 ###############################################################################
 
 import sympy as sp
 import numpy as np
-from DatasetGenerator import ArithDatasetGen
+from DatasetGenerator import ExpressionGenerator
 from PrecedenceEvaluator import PrecedenceEvaluator
 import re # Needed for extracting operands and operators from regular 
           # expressions
 import math
-
 
 
 """
@@ -109,7 +108,7 @@ class ExpressionEvaluator():
     def __get_eval_steps(self, expression_str):
         eval_steps = {}
         i = 0
-        print("\n\n\nOriginal expression:", expression_str)
+        # print("\n\n\nOriginal expression:", expression_str)
         while not self.__is_solved(expression_str):
             self.precedence_eval.was_add_or_sub = False
             self.precedence_eval.was_double_negative = False
@@ -118,8 +117,8 @@ class ExpressionEvaluator():
             next_subexpr, start_idx, end_idx = \
                 self.precedence_eval.next_subexpression(expression_str)
             # Solve the atomic subexpression
-            print("expression so far:", expression_str)
-            print("sub expression:", next_subexpr)
+            # print("expression so far:", expression_str)
+            # print("sub expression:", next_subexpr)
             subexp = sp.sympify(next_subexpr)
             subexpr_result = str(float(subexp.evalf())) # float needed due to sympys unnecessary precision
             ## Substitute the result back into the original expression
@@ -148,43 +147,59 @@ class ExpressionEvaluator():
         return (eval_steps, operator_counts, operand_counts)
     """ Generates the dataset of arithmetic expressions with the steps to solve them """
     def process_dataset(self):
-        for raw_sample in self.__raw_dataset:
-            # raw_sample = raw_sample.replace(" ", "")
-            print(raw_sample)
+        for __, raw_sample in list(self.__raw_dataset.items()):
+            raw_sample = raw_sample.replace(" ", "")
             eval_steps, operator_counts, operand_counts = self.process_sample(raw_sample)
             self.__processed_dataset[raw_sample] = {"eval_steps": eval_steps,
                                                     "operator_counts": operator_counts,
                                                     "operand_counts": operand_counts}
         return self.__processed_dataset
 
-def main():
-    raw_datagen = ArithDatasetGen(num_samples=10 , lower_bound=0, upper_bound=5)
-    # raw_dataset = raw_datagen.generate_new_dataset()
-    # raw_dataset  = ["9*1-5*5+(2-8*4-8*11-(2-2*10))"]
-    raw_dataset = ["5-10*0+7+1+10*7*3+(7*8)*4+7"]
-    expression_evaluator = ExpressionEvaluator(raw_dataset)
 
-    # print(f"original expression: {test_expression}")
+def main():
+    max_val = 12
+    raw_datagen = ExpressionGenerator(num_samples=10000, min_value=-max_val, max_value=max_val, max_nesting=4)
+    raw_dataset = raw_datagen.generate_dataset()
+    expression_evaluator = ExpressionEvaluator(raw_dataset)
     processed_dataset = expression_evaluator.process_dataset()
-    for expression in raw_dataset:
+    original_expressions = processed_dataset.keys()
+    
+    # Check that all the computed results are near their true values
+    all_results_close = True
+    debug_mode = True
+    num_right = 0
+    print("Number of original expressions: ", len(raw_dataset.values()))
+    print("Number of solved expressions: ", len(original_expressions))
+    for expression in original_expressions:
         eval_steps = list(processed_dataset[expression]['eval_steps'].values())
         computed_result = float(eval_steps[-1])
         sympy_expression = sp.sympify(expression)
         true_result = float(sympy_expression.evalf())
         # assert type(computed_result) == type(true_result)
-        print("True result: ", true_result)
-        print("computed result:", computed_result)
-        print("True result: ", true_result)
-        print("computed result:", computed_result)
-    print(processed_dataset)
-
-# original_expressions = processed_dataset.keys()
-    
-#     # Check that all the computed results are near their true values
-#     all_results_close = True
-#     debug_mode = True
-#     num_right = 0
-#     for expression in original_expressions:
+        if not math.isclose(computed_result, true_result, abs_tol=1e-06):
+            all_results_close = False
+            if debug_mode:
+                print
+                print("original expression: ", expression)
+                print("you got one wrong")
+                print("computed result: ", computed_result)
+                print("true_result:", true_result)
+                print("eval steps: ")
+                for i, step in enumerate(eval_steps):
+                    print(step)
+                    sympy_sub_expr = sp.sympify(step)
+                    computed_result_subexpr = float(sympy_sub_expr.evalf())
+                    print("i outside", i)
+                    if not np.isclose(computed_result_subexpr,true_result, abs_tol=1e-06):
+                        print("\n\nthis is where the logic error occurs: ")
+                        print("i", i)
+                        print("previous step:", eval_steps[i-1])
+                        print("Current step:", step)
+                        exit()
+        else:
+            num_right +=1
+    print("num right: ", num_right)
+    print("All samples correct: ", all_results_close)
 
 
 
