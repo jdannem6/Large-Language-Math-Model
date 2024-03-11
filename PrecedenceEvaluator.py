@@ -235,7 +235,10 @@ class PrecedenceEvaluator:
             " Revisit this; not sure why this fixed issue"
             if sub_exp.startswith("-"):
                 self.__last_subexpr_start -=1
-                self.__last_subexpr_end +=1
+                if not self.was_double_negative:
+                    self.__last_subexpr_end +=1
+                else:
+                    self.__last_subexpr_end +=2
         return (sub_exp, self.__last_subexpr_start, self.__last_subexpr_end)
         
 def main():
