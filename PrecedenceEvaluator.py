@@ -104,6 +104,38 @@ class PrecedenceEvaluator:
         self.__last_subexpr_end = end_idx
         return most_nested_exp[0]
     
+    """ Determines if double negative exists in given expression """
+    def __has_double_negative(self, expression_str):
+        match = re.search(r'-\s*-\s*\d+(\.\d+)?', expression_str)
+        if match:
+            return True
+        else:
+            return False
+    """ Locates any subexpressions having double negatives in front of an operand
+        E.g., 5 - -2. and returns the two indices locating it within the 
+        expression. Used to sub cases like --2 for +2
+    """
+    def __extract_double_negative(self, expression_str):
+        match = re.search(r'-\s*-\s*\d+(\.\d+)?', expression_str)
+        if match:
+            # Extracting the match without spaces for clarity and calculating indices
+            extracted = match.group(0).replace(" ", "")
+            start =  match.start()
+            end = match.end() - 1
+            len_start_paren = 1
+            """ Refactor this. At the very least, come back and provide names to
+                the constants """
+            if self.__is_parenth_operation:
+                self.__last_subexpr_end = self.__last_subexpr_start + end -1\
+                                
+                self.__last_subexpr_start = self.__last_subexpr_start + start + \
+                                            len_start_paren + 1
+            else:
+                self.__last_subexpr_start = start
+                self.__last_subexpr_end = end
+            return extracted
+        else:
+            return ""
     def __extract_exponentiation(self, expression_str):
         idx = expression_str.find('^')
         if idx != -1:
@@ -183,7 +215,13 @@ class PrecedenceEvaluator:
             # Remove outer parenthesis from the extracted expression and pass it
             # to the next functions
             expression_str = sub_exp[1:-1]
-        if '^' in expression_str:
+        # Search for any double negatives
+        if self.__has_double_negative(expression_str):
+            sub_exp = self.__extract_double_negative(expression_str)
+            # Set flag to replace double negative with + in the 
+            # Expression Evaluator
+            self.was_double_negative = True
+        elif '^' in expression_str:
             sub_exp = self.__extract_exponentiation(expression_str)
         elif '*' in expression_str or '/' in expression_str:
             sub_exp = self.__extract_mult_divis(expression_str)

@@ -24,6 +24,7 @@ import re # Needed for extracting operands and operators from regular
 import math
 
 
+
 """
     Searches for numbers within an arithmetic expression string that are written in scientific notation
     (e.g., 2.541e-05) and converts those numbers to a string form that doesn't use scientific notation.
@@ -108,23 +109,25 @@ class ExpressionEvaluator():
     def __get_eval_steps(self, expression_str):
         eval_steps = {}
         i = 0
-        # print("original expression string:", expression_str)
+        # print("\n\n\nOriginal expression:", expression_str)
         while not self.__is_solved(expression_str):
             self.precedence_eval.was_add_or_sub = False
+            self.precedence_eval.was_double_negative = False
             # Determine the highest precedence subexpression within the
             # expression string
-            # print("current expression string: ", expression_str)
             next_subexpr, start_idx, end_idx = \
                 self.precedence_eval.next_subexpression(expression_str)
-            print("expression so far:", expression_str)
-            print("next subexpression:", next_subexpr)
             # Solve the atomic subexpression
-            # print("subexp:", next_subexpr)
+            # print("expression so far:", expression_str)
+            # print("sub expression:", next_subexpr)
             subexp = sp.sympify(next_subexpr)
             subexpr_result = str(float(subexp.evalf())) # float needed due to sympys unnecessary precision
-            # Substitute the result back into the original expression
+            ## Substitute the result back into the original expression
+            # Add addition character back into the expression if there was a double negative
+            # or if there was an addition or subtraction operation with the first operand being negative
             addition_char = ""
-            if self.precedence_eval.was_add_or_sub:
+            if (self.precedence_eval.was_add_or_sub and start_idx != 0)\
+                or self.precedence_eval.was_double_negative:
                 addition_char = "+"
             expression_str = expression_str[:start_idx] + addition_char + subexpr_result \
                             + expression_str[end_idx+1:]
@@ -133,15 +136,11 @@ class ExpressionEvaluator():
 
             eval_steps[i] = expression_str
             i +=1
-            if i >50:
-                exit()
         return eval_steps
-    
     """ Generates the operator counts, operand counts, and the steps for a given 
         raw expression sample. Returns dictionary mapping the expression to 
         these three dictionaries """
     def process_sample(self, raw_sample_str):
-
         eval_steps =  self.__get_eval_steps(raw_sample_str)
         operator_counts = self.__get_operator_counts(raw_sample_str)
         operand_counts = self.__get_operand_counts(raw_sample_str)
@@ -161,7 +160,8 @@ class ExpressionEvaluator():
 def main():
     raw_datagen = ArithDatasetGen(num_samples=10 , lower_bound=0, upper_bound=5)
     # raw_dataset = raw_datagen.generate_new_dataset()
-    raw_dataset  = ["1-7+4+4+5+4-7*8-8-3-3*5-(-2.0)+6+10"]
+    # raw_dataset  = ["9*1-5*5+(2-8*4-8*11-(2-2*10))"]
+    raw_dataset = ["5-10*0+7+1+10*7*3+(7*8)*4+7"]
     expression_evaluator = ExpressionEvaluator(raw_dataset)
 
     # print(f"original expression: {test_expression}")
