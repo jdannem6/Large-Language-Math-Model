@@ -2,7 +2,7 @@
 ## Decription: Defines a class to take an arithmetic expression string and   ##
 ##             determine and return the atomic subexpression within it       ##
 ##             having highest precedence                                     ## 
-## Last Modified: 8 March 2024                                               ##
+## Last Modified: 9 March 2024                                               ##
 ###############################################################################
 import re
 class PrecedenceEvaluator:
@@ -12,7 +12,7 @@ class PrecedenceEvaluator:
         self.__operators = ["^", "*", "/", "+", "-"]
 
 
-    def __extract_operation(self, expression_str, op_idx):
+    def __extract_operation(self, expression_str, op_idx, add_paren_offset = True):
         start = op_idx - 1
         while start > 0 and (expression_str[start].isdigit() 
                              or expression_str[start] == ".") :
@@ -32,7 +32,13 @@ class PrecedenceEvaluator:
             is_first_op_neg = True 
         # If this negative sign is actaully a subtraction, operand is not neg.
         if (start - 1) > 0 and expression_str[start - 1] not in self.__operators:
-            is_first_op_neg = False
+            operator = expression_str[op_idx]
+            if operator not in ["+", "-"]:
+
+                is_first_op_neg = False
+            else:
+                self.was_add_or_sub = True
+
 
         # Index finding loops go one index past last digit; come back one
         # Note: there is no need to come back one if first operand is negative
@@ -42,8 +48,12 @@ class PrecedenceEvaluator:
         # Store the start and end index if needed later for substitution
         # purposes. For parenthesis expressions, add the index to the 
         # index of first parenthessis
-        """" Adds 1 to both to account for skipped beginning parenthesis"""
-        len_start_paren = 1
+        """" Adds 1 to both to account for skipped beginning parenthesis. 
+             the add_paren_offset prevents this from being added multiple
+             times"""
+        len_start_paren = 0
+        if add_paren_offset:
+            len_start_paren = 1
         if self.__is_parenth_operation:
             self.__last_subexpr_end = self.__last_subexpr_start + end + \
                             len_start_paren
@@ -53,7 +63,10 @@ class PrecedenceEvaluator:
         if not self.__is_parenth_operation:
             self.__last_subexpr_start = start
             self.__last_subexpr_end = end
-        return expression_str[start:end+1]
+
+
+        sub_exp = expression_str[start:end+1]
+        return sub_exp
     
     def __determine_nested_levels(self, expression_str):
         nested_levels_list = []
@@ -112,15 +125,32 @@ class PrecedenceEvaluator:
         sub_idx = expression_str.find('-')
         if add_idx == -1 and sub_idx == -1:
             return ""
-        if add_idx != -1 and (sub_idx == -1 or add_idx < sub_idx):
-            return self.__extract_operation(expression_str, add_idx)
+        # Perform the math operation if it exist and comes before the
+        # the subtraction (if exists) of if the "subtraction" is actually 
+        # a negative number
+        if add_idx != -1 and (sub_idx == -1 or add_idx < sub_idx or \
+                              self.is_constant(self.__extract_operation(expression_str, sub_idx, 
+                                                                        add_paren_offset=False))):
+            return self.__extract_operation(expression_str, add_idx, add_paren_offset = True)
+        # Otherwise perform the subtraction operation
         if sub_idx != -1:
-            return self.__extract_operation(expression_str, sub_idx)
+            # If the expression is a subtraction operation, return it
+            sub_expr =  self.__extract_operation(expression_str, sub_idx, add_paren_offset=True)
+            if not self.is_constant(sub_expr):
+                return sub_expr
+            # Otherwise if the extracted operation is actually just a negative
+            # constant, search for other subtraction operations
+            else:
+                next_sub_idx = expression_str.find('-', sub_idx + 1)
+                while (self.is_constant(sub_expr) and next_sub_idx != -1):
+                    sub_expr = self.__extract_operation(expression_str, next_sub_idx, 
+                                                        add_paren_offset=False)
+                return sub_expr
 
     """
     Determines if a given string subexpression represents only a constant. 
     """
-    def __is_constant(self, sub_expr):
+    def is_constant(self, sub_expr):
 
         # Remove surrounding parentheses if they exist
         if sub_expr.startswith("(") and sub_expr.endswith(")"):
@@ -161,9 +191,10 @@ class PrecedenceEvaluator:
             sub_exp = self.__extract_add_sub(expression_str)
         # Otherwise, if the subexpression is a postive or negative constant
         # Remove the parenthesis from the expression
-        if (self.__is_constant(sub_exp)):
+        if (self.is_constant(sub_exp)) and self.__is_parenth_operation:
             if sub_exp.startswith("(") and sub_exp.endswith(")"):
                 sub_exp= sub_exp[1:-1]
+            " Revisit this; not sure why this fixed issue"
             if sub_exp.startswith("-"):
                 self.__last_subexpr_start -=1
                 self.__last_subexpr_end +=1

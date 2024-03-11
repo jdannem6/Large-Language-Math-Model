@@ -23,6 +23,27 @@ import re # Needed for extracting operands and operators from regular
           # expressions
 import math
 
+
+"""
+    Searches for numbers within an arithmetic expression string that are written in scientific notation
+    (e.g., 2.541e-05) and converts those numbers to a string form that doesn't use scientific notation.
+"""
+
+def convert_sci_notation_terms(expression):
+
+    # Regular expression to find numbers in scientific notation
+    sci_notation_regex = r'\b\d+\.?\d*[eE][+-]?\d+\b'
+
+    def replace_sci_notation(match):
+        # Convert the scientific notation number to decimal
+        # and format it to remove trailing zeros
+        number = float(match.group())
+        return '{:f}'.format(number).rstrip('0').rstrip('.')
+
+    # Use re.sub() to replace all occurrences of scientific notation in the expression
+    return re.sub(sci_notation_regex, replace_sci_notation, expression)
+
+
 class ExpressionEvaluator():
     def __init__(self, raw_dataset):
         self.__raw_dataset = raw_dataset
@@ -75,10 +96,10 @@ class ExpressionEvaluator():
         operator_pattern = r'[\^\*/\+\-\(\)]'
         operators_in_expr = re.findall(operator_pattern, expression_str)
         # Expression is solved if there are no operators left in string or for negative numbers
-        # if there is one operator (the negative sign)
-        print("expression string in is solved: ", expression_str)
+        # if there is just one with a constant expression (a negative number)
         expression_is_solved = len(operators_in_expr) == 0 or \
-                               "-" in expression_str  and len(operators_in_expr) == 1
+                               "-" in expression_str  and \
+                                 self.precedence_eval.is_constant(expression_str)
         return expression_is_solved
     
     """ Converts the string form describing the expression to a dictionary of 
@@ -87,19 +108,33 @@ class ExpressionEvaluator():
     def __get_eval_steps(self, expression_str):
         eval_steps = {}
         i = 0
+        # print("original expression string:", expression_str)
         while not self.__is_solved(expression_str):
+            self.precedence_eval.was_add_or_sub = False
             # Determine the highest precedence subexpression within the
             # expression string
+            # print("current expression string: ", expression_str)
             next_subexpr, start_idx, end_idx = \
                 self.precedence_eval.next_subexpression(expression_str)
+            print("expression so far:", expression_str)
+            print("next subexpression:", next_subexpr)
             # Solve the atomic subexpression
+            # print("subexp:", next_subexpr)
             subexp = sp.sympify(next_subexpr)
             subexpr_result = str(float(subexp.evalf())) # float needed due to sympys unnecessary precision
             # Substitute the result back into the original expression
-            expression_str = expression_str[:start_idx] + subexpr_result \
+            addition_char = ""
+            if self.precedence_eval.was_add_or_sub:
+                addition_char = "+"
+            expression_str = expression_str[:start_idx] + addition_char + subexpr_result \
                             + expression_str[end_idx+1:]
+            # Convert any values in from scientific notation to standard form
+            expression_str = convert_sci_notation_terms(expression_str)
+
             eval_steps[i] = expression_str
             i +=1
+            if i >50:
+                exit()
         return eval_steps
     
     """ Generates the operator counts, operand counts, and the steps for a given 
@@ -123,21 +158,33 @@ class ExpressionEvaluator():
                                                     "operand_counts": operand_counts}
         return self.__processed_dataset
 
-from sympy import pprint
-
-
 def main():
-    raw_datagen = ArithDatasetGen(num_samples=10, lower_bound=1, upper_bound=10)
-    raw_dataset = raw_datagen.generate_new_dataset()
-    # pprint(raw_dataset)
-    # raw_dataset = ["(3-(2-3-3-4))-(3-2)"]
-    raw_dataset = ["(3+(2+3-3^4))*(3+2)"]
-    
+    raw_datagen = ArithDatasetGen(num_samples=10 , lower_bound=0, upper_bound=5)
+    # raw_dataset = raw_datagen.generate_new_dataset()
+    raw_dataset  = ["1-7+4+4+5+4-7*8-8-3-3*5-(-2.0)+6+10"]
     expression_evaluator = ExpressionEvaluator(raw_dataset)
 
+    # print(f"original expression: {test_expression}")
     processed_dataset = expression_evaluator.process_dataset()
-    pprint(processed_dataset)
+    for expression in raw_dataset:
+        eval_steps = list(processed_dataset[expression]['eval_steps'].values())
+        computed_result = float(eval_steps[-1])
+        sympy_expression = sp.sympify(expression)
+        true_result = float(sympy_expression.evalf())
+        # assert type(computed_result) == type(true_result)
+        print("True result: ", true_result)
+        print("computed result:", computed_result)
+        print("True result: ", true_result)
+        print("computed result:", computed_result)
+    print(processed_dataset)
 
+# original_expressions = processed_dataset.keys()
+    
+#     # Check that all the computed results are near their true values
+#     all_results_close = True
+#     debug_mode = True
+#     num_right = 0
+#     for expression in original_expressions:
 
 
 
