@@ -109,7 +109,7 @@ class ExpressionEvaluator():
     def __get_eval_steps(self, expression_str):
         eval_steps = {}
         i = 0
-        # print("\n\n\nOriginal expression:", expression_str)
+        print("\n\n\nOriginal expression:", expression_str)
         while not self.__is_solved(expression_str):
             self.precedence_eval.was_add_or_sub = False
             self.precedence_eval.was_double_negative = False
@@ -118,8 +118,8 @@ class ExpressionEvaluator():
             next_subexpr, start_idx, end_idx = \
                 self.precedence_eval.next_subexpression(expression_str)
             # Solve the atomic subexpression
-            # print("expression so far:", expression_str)
-            # print("sub expression:", next_subexpr)
+            print("expression so far:", expression_str)
+            print("sub expression:", next_subexpr)
             subexp = sp.sympify(next_subexpr)
             subexpr_result = str(float(subexp.evalf())) # float needed due to sympys unnecessary precision
             ## Substitute the result back into the original expression

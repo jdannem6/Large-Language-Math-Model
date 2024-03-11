@@ -31,7 +31,7 @@ class PrecedenceEvaluator:
         if expression_str[start] == "-":
             is_first_op_neg = True 
         # If this negative sign is actaully a subtraction, operand is not neg.
-        if (start - 1) > 0 and expression_str[start - 1] not in self.__operators:
+        if (start - 1) >= 0 and expression_str[start - 1] not in self.__operators:
             operator = expression_str[op_idx]
             if operator not in ["+", "-"]:
 
