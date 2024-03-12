@@ -45,9 +45,11 @@ def convert_sci_notation_terms(expression):
 
 
 class ExpressionEvaluator():
-    def __init__(self, raw_dataset):
+    def __init__(self, raw_dataset, whitespace_amount):
         self.__raw_dataset = raw_dataset
         self.__processed_dataset = {}
+        # Number of spaces to use between each operator and operand
+        self.whitespace_amount = whitespace_amount
         self.precedence_eval = PrecedenceEvaluator()
 
     """ Converts a list of symbol occurrences to a dictionary giving
@@ -88,6 +90,31 @@ class ExpressionEvaluator():
         ## expression
         operator_counts = self.__convert_to_count_dict(operators_in_expression)
         return operator_counts       
+    
+    def __insert_whitespace(self, expression: str, num_spaces: int = 1) -> str:
+        # Define the space to be inserted
+        space = ' ' * num_spaces
+        
+        # Step 1: Replace subtraction signs (-) with a unique marker when followed by a digit or a decimal point,
+        # ensuring we do not confuse them with negative numbers.
+        expression = re.sub(r'(?<=\d|\))-(?=\d|\.)', f'§', expression)
+        
+        # Step 2: Insert spaces around operators (+, -, *, /), excluding the negative sign directly followed by a digit or decimal.
+        expression = re.sub(r'([\+\*\/])', r' \1 ', expression)
+        
+        # Step 3: Reinsert subtraction signs with spaces.
+        expression = expression.replace('§', space + '-' + space)
+        
+        # Step 4: Adjust for cases where a negative number is directly after an operator or at the start of the expression,
+        # ensuring no space between the negative sign and its number.
+        expression = re.sub(r'(?<=\D)-(?=\d|\.)', '-', expression)
+        if expression.startswith('-'):
+            expression = '-' + expression[1:]
+        
+        # Step 5: Ensure the correct amount of spaces is applied based on num_spaces.
+        expression = re.sub(' +', space, expression)
+        
+        return expression
     """ Simple helper function to determine if expression is fully simplified
         based on whether operators still exist within it """
     def __is_solved(self, expression_str):
@@ -109,7 +136,10 @@ class ExpressionEvaluator():
         eval_steps = {}
         i = 0
         # print("\n\n\nOriginal expression:", expression_str)
+
         while not self.__is_solved(expression_str):
+            # Remove whitespace for ease of evaluation
+            expression_str = expression_str.replace(" ", "")
             self.precedence_eval.was_add_or_sub = False
             self.precedence_eval.was_double_negative = False
             # Determine the highest precedence subexpression within the
@@ -133,6 +163,8 @@ class ExpressionEvaluator():
             # Convert any values in from scientific notation to standard form
             expression_str = convert_sci_notation_terms(expression_str)
 
+            # Reinsert the desired level of whitespace
+            expression_str = self.__insert_whitespace(expression_str, self.whitespace_amount)
             eval_steps[i] = expression_str
             i +=1
         return eval_steps
@@ -148,7 +180,6 @@ class ExpressionEvaluator():
     """ Generates the dataset of arithmetic expressions with the steps to solve them """
     def process_dataset(self):
         for __, raw_sample in list(self.__raw_dataset.items()):
-            raw_sample = raw_sample.replace(" ", "")
             eval_steps, operator_counts, operand_counts = self.process_sample(raw_sample)
             self.__processed_dataset[raw_sample] = {"eval_steps": eval_steps,
                                                     "operator_counts": operator_counts,
@@ -158,9 +189,10 @@ class ExpressionEvaluator():
 
 def main():
     max_val = 12
-    raw_datagen = ExpressionGenerator(num_samples=10000, min_value=-max_val, max_value=max_val, max_nesting=4)
-    raw_dataset = raw_datagen.generate_dataset()
-    expression_evaluator = ExpressionEvaluator(raw_dataset)
+    # raw_datagen = ExpressionGenerator(num_samples=10000, min_value=-max_val, max_value=max_val, max_nesting=4)
+    # raw_dataset = raw_datagen.generate_dataset()
+    raw_dataset = {0: "-2 + 8 * (10 - 3) / 6"}
+    expression_evaluator = ExpressionEvaluator(raw_dataset, whitespace_amount=1)
     processed_dataset = expression_evaluator.process_dataset()
     original_expressions = processed_dataset.keys()
     
@@ -172,6 +204,10 @@ def main():
     print("Number of solved expressions: ", len(original_expressions))
     for expression in original_expressions:
         eval_steps = list(processed_dataset[expression]['eval_steps'].values())
+        print("original expression: ", expression)
+        print("eval steps:")
+        for step in eval_steps:
+            print(step)
         computed_result = float(eval_steps[-1])
         sympy_expression = sp.sympify(expression)
         true_result = float(sympy_expression.evalf())
